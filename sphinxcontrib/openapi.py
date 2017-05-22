@@ -13,6 +13,10 @@ import io
 import itertools
 import collections
 
+try:
+    from http.client import responses as http_responses
+except:
+    from httplib import responses as http_responses
 import yaml
 import jsonschema
 
@@ -96,6 +100,12 @@ def _httpresource(endpoint, method, properties):
         for line in param.get('description', '').splitlines():
             yield '{indent}{indent}{line}'.format(**locals())
 
+    # print request's header content
+    if 'consumes' in properties:
+        for content_type in properties['consumes']:
+            yield '{0}:reqheader Content-Type: {1}'.format(indent,
+                                                           content_type)
+
     # print request's query params
     for param in filter(lambda p: p['in'] == 'query', parameters):
         yield indent + ':query {type} {name}:'.format(**param)
@@ -120,6 +130,27 @@ def _httpresource(endpoint, method, properties):
             yield indent + ':resheader {name}:'.format(name=headername)
             for line in header['description'].splitlines():
                 yield '{indent}{indent}{line}'.format(**locals())
+
+        for content_type, content in response.get('examples', {}).items():
+            if content_type == 'application/json':
+                import json
+                content = json.dumps(content, indent=2)
+                content_length = len(content)
+                status_string = http_responses[int(status)]
+
+            yield '{indent}**Response**'.format(**locals())
+            yield ''
+            yield '{indent}{indent}.. sourcecode:: http'.format(**locals())
+            yield ''
+            yield '{indent}{indent}{indent}HTTP/1.0 {status} {status_string}'.format(**locals())
+            yield '{indent}{indent}{indent}Content-Length: {content_length}'.format(**locals())
+            yield '{indent}{indent}{indent}Content-Type: {content_type}'.format(**locals())
+            yield ''
+
+            for line in content.splitlines():
+                yield '{indent}{indent}{indent}{line}'.format(**locals())
+
+            yield '{indent}:resheader Content-Type: {content_type}'.format(**locals())
 
     yield ''
 
